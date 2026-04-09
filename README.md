@@ -153,6 +153,18 @@ Hermes Desktop keeps that direct path visible and usable: real SSH, real
 terminal, real remote files. It does not try to hide Hermes behind a separate
 gateway layer or turn it into something else.
 
+## Roadmap
+
+This is the current direction for the next waves of work:
+
+- skill management views for tracking, inspecting, editing, and organizing agent skills from the app
+- UI skins and appearance options to personalize the terminal and the broader chat-like workspace
+- expanded memory tracking, including `SOUL.md` alongside `USER.md` and `MEMORY.md`
+- clearer documentation, setup guides, and troubleshooting for new users
+- easier distribution for non-technical users through signed, notarized builds and, if realistic, App Store or similarly frictionless delivery
+- better first-run onboarding and connection diagnostics so SSH setup problems are easier to understand and fix
+- continued product polish across session browsing, terminal UX, and multi-host workflows
+
 ## Build From Source
 
 For local development:
