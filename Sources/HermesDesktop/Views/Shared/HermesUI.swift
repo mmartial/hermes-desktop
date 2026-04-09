@@ -118,7 +118,9 @@ struct HermesBadge: View {
         Text(text)
             .font(isMonospaced ? .system(.caption, design: .monospaced).weight(.semibold) : .caption.weight(.semibold))
             .foregroundStyle(tint)
-            .padding(.horizontal, 8)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: true)
+            .padding(.horizontal, 9)
             .padding(.vertical, 4)
             .background(tint.opacity(0.12), in: Capsule())
     }

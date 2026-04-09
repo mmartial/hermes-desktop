@@ -5,6 +5,7 @@ enum AppSection: String, CaseIterable, Identifiable {
     case overview
     case files
     case sessions
+    case skills
     case terminal
 
     var id: String { rawValue }
@@ -19,6 +20,8 @@ enum AppSection: String, CaseIterable, Identifiable {
             "Files"
         case .sessions:
             "Sessions"
+        case .skills:
+            "Skills"
         case .terminal:
             "Terminal"
         }
@@ -34,6 +37,8 @@ enum AppSection: String, CaseIterable, Identifiable {
             "doc.text"
         case .sessions:
             "clock.arrow.circlepath"
+        case .skills:
+            "book.closed"
         case .terminal:
             "terminal"
         }

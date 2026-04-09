@@ -17,6 +17,12 @@ final class AppState: ObservableObject {
     @Published var sessionsError: String?
     @Published var isLoadingSessions = false
     @Published var hasMoreSessions = false
+    @Published var selectedSkillID: String?
+    @Published var skills: [SkillSummary] = []
+    @Published var selectedSkillDetail: SkillDetail?
+    @Published var skillsError: String?
+    @Published var isLoadingSkills = false
+    @Published var isLoadingSkillDetail = false
     @Published var selectedTrackedFile: RemoteTrackedFile = .memory
     @Published var memoryDocument = FileEditorDocument(trackedFile: .memory)
     @Published var userDocument = FileEditorDocument(trackedFile: .user)
@@ -29,6 +35,7 @@ final class AppState: ObservableObject {
     let remoteHermesService: RemoteHermesService
     let fileEditorService: FileEditorService
     let sessionBrowserService: SessionBrowserService
+    let skillBrowserService: SkillBrowserService
     let terminalWorkspace: TerminalWorkspaceStore
 
     private let sessionPageSize = 50
@@ -46,6 +53,7 @@ final class AppState: ObservableObject {
         self.remoteHermesService = RemoteHermesService(sshTransport: sshTransport)
         self.fileEditorService = FileEditorService(sshTransport: sshTransport)
         self.sessionBrowserService = SessionBrowserService(sshTransport: sshTransport)
+        self.skillBrowserService = SkillBrowserService(sshTransport: sshTransport)
         self.terminalWorkspace = TerminalWorkspaceStore(sshTransport: sshTransport)
 
         connectionStore.objectWillChange
@@ -314,6 +322,60 @@ final class AppState: ObservableObject {
         }
     }
 
+    func loadSkills(reset: Bool = false) async {
+        guard let profile = activeConnection else { return }
+        if isLoadingSkills { return }
+
+        if reset {
+            skills = []
+            selectedSkillID = nil
+            selectedSkillDetail = nil
+            isLoadingSkillDetail = false
+        }
+
+        isLoadingSkills = true
+        skillsError = nil
+
+        do {
+            let items = try await skillBrowserService.listSkills(connection: profile)
+            skills = items
+            isLoadingSkills = false
+
+            if reset, let first = items.first {
+                await loadSkillDetail(relativePath: first.id)
+            }
+        } catch {
+            isLoadingSkills = false
+            skillsError = error.localizedDescription
+            setStatusMessage("Unable to load skills")
+        }
+    }
+
+    func loadSkillDetail(relativePath: String) async {
+        guard let profile = activeConnection else { return }
+        selectedSkillID = relativePath
+        selectedSkillDetail = nil
+        skillsError = nil
+        isLoadingSkillDetail = true
+
+        do {
+            let detail = try await skillBrowserService.loadSkillDetail(
+                connection: profile,
+                relativePath: relativePath
+            )
+
+            guard selectedSkillID == relativePath else { return }
+            selectedSkillDetail = detail
+            isLoadingSkillDetail = false
+        } catch {
+            guard selectedSkillID == relativePath else { return }
+            selectedSkillDetail = nil
+            isLoadingSkillDetail = false
+            skillsError = error.localizedDescription
+            setStatusMessage("Unable to load skill detail")
+        }
+    }
+
     func deleteConnection(_ profile: ConnectionProfile) {
         connectionStore.delete(profile)
         if activeConnectionID == profile.id {
@@ -336,6 +398,8 @@ final class AppState: ObservableObject {
             Task { await ensureInitialFileLoads() }
         case .sessions:
             Task { await loadSessions(reset: sessions.isEmpty) }
+        case .skills:
+            Task { await loadSkills(reset: skills.isEmpty) }
         case .terminal:
             ensureTerminalSession()
         case .connections:
@@ -378,6 +442,12 @@ final class AppState: ObservableObject {
         guard overviewError == nil else {
             sessions = []
             sessionMessages = []
+            skills = []
+            selectedSkillID = nil
+            selectedSkillDetail = nil
+            skillsError = nil
+            isLoadingSkills = false
+            isLoadingSkillDetail = false
             resetDocuments()
             return
         }
@@ -396,6 +466,12 @@ final class AppState: ObservableObject {
         hasMoreSessions = false
         selectedSessionID = nil
         sessionOffset = 0
+        skills = []
+        selectedSkillID = nil
+        selectedSkillDetail = nil
+        skillsError = nil
+        isLoadingSkills = false
+        isLoadingSkillDetail = false
         resetDocuments()
         terminalWorkspace.closeAllTabs()
     }
