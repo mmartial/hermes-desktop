@@ -3,7 +3,10 @@
 Native macOS app for Hermes over SSH.
 
 Hermes Desktop gives you the parts of Hermes that matter most on a Mac:
-sessions, memories, and a real terminal. In one clean place.
+sessions, memories, and a real terminal. In one clean place. 
+
+<img width="1301" height="802" alt="Screenshot 2026-04-09 alle 14 04 22" src="https://github.com/user-attachments/assets/42c91c5f-51f4-4c6d-b43b-61948ec552c1" />
+
 
 It stays deliberately simple:
 
