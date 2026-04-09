@@ -60,9 +60,15 @@ ssh your-host
 4. Open it.
 
 The current public build is Apple Silicon only and not notarized yet.
+Because of that, macOS may show a warning saying Apple cannot verify the app
+for malware. That is expected for this release and does not mean macOS found
+malware in Hermes Desktop.
 
-If macOS blocks the first launch, right click the app and choose `Open` once.
-If needed, use `Privacy & Security` -> `Open Anyway`.
+If macOS blocks the first launch:
+
+1. Click `Done`, not `Move to Bin`.
+2. Right click `HermesDesktop.app` and choose `Open`.
+3. If needed, go to `Privacy & Security` and click `Open Anyway`.
 
 ## Connect Your Hermes Host
 
