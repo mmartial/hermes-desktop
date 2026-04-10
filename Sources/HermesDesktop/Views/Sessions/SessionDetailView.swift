@@ -1,9 +1,13 @@
 import SwiftUI
 
 struct SessionDetailView: View {
+    @EnvironmentObject private var appState: AppState
+
     let session: SessionSummary?
     let messages: [SessionMessage]
     let errorMessage: String?
+
+    @State private var showDeleteConfirmation = false
 
     var body: some View {
         ScrollView {
@@ -25,8 +29,33 @@ struct SessionDetailView: View {
 
                                 Spacer(minLength: 12)
 
-                                if let count = session.messageCount {
-                                    HermesBadge(text: "\(count) messages", tint: .accentColor)
+                                HStack(spacing: 8) {
+                                    if let count = session.messageCount {
+                                        HermesBadge(text: "\(count) messages", tint: .accentColor)
+                                    }
+
+                                    Button {
+                                        showDeleteConfirmation = true
+                                    } label: {
+                                        Group {
+                                            if appState.isDeletingSession && appState.selectedSessionID == session.id {
+                                                ProgressView()
+                                                    .controlSize(.small)
+                                            } else {
+                                                Image(systemName: "trash")
+                                                    .font(.caption.weight(.semibold))
+                                            }
+                                        }
+                                        .foregroundStyle(.red)
+                                        .frame(minWidth: 14, minHeight: 14)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 7)
+                                        .background(Color.red.opacity(0.12), in: Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .help("Delete session")
+                                    .accessibilityLabel("Delete session")
+                                    .disabled(appState.isDeletingSession)
                                 }
                             }
 
@@ -108,6 +137,16 @@ struct SessionDetailView: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 22)
         }
+        .alert("Delete this session?", isPresented: $showDeleteConfirmation, presenting: session) { session in
+            Button("Delete", role: .destructive) {
+                Task {
+                    await appState.deleteSession(session)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { session in
+            Text("“\(session.resolvedTitle)” will be removed from Hermes Desktop and deleted on the remote Hermes host as well. This action cannot be undone.")
+        }
     }
 }
 
@@ -143,7 +182,7 @@ private struct MessageCard: View {
                         .italic()
                 }
 
-                if let metadata = message.metadata, !metadata.isEmpty {
+                if let metadata = message.displayMetadata, !metadata.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Metadata")
                             .font(.caption.weight(.semibold))

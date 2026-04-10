@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SessionsView: View {
     @EnvironmentObject private var appState: AppState
+    @State private var searchText = ""
 
     var body: some View {
         HSplitView {
@@ -11,7 +12,7 @@ struct SessionsView: View {
                     subtitle: "Browse the recent Hermes conversations discovered on the active host."
                 ) {
                     Button {
-                        Task { await appState.loadSessions(reset: true) }
+                        Task { await appState.loadSessions(reset: true, query: searchText) }
                     } label: {
                         Label("Refresh", systemImage: "arrow.clockwise")
                     }
@@ -19,7 +20,7 @@ struct SessionsView: View {
                     .disabled(appState.isLoadingSessions)
                 }
 
-                sessionsPanel
+                sessionsContent
             }
             .frame(minWidth: 300, idealWidth: 340, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(.horizontal, 20)
@@ -37,6 +38,29 @@ struct SessionsView: View {
             if appState.sessions.isEmpty {
                 await appState.loadSessions(reset: true)
             }
+        }
+        .task(id: searchText) {
+            guard appState.activeConnectionID != nil else { return }
+
+            let normalizedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard normalizedQuery != appState.sessionSearchQuery else { return }
+
+            try? await Task.sleep(for: .milliseconds(280))
+            guard !Task.isCancelled else { return }
+            await appState.loadSessions(reset: true, query: searchText)
+        }
+    }
+
+    @ViewBuilder
+    private var sessionsContent: some View {
+        if appState.sessions.isEmpty && appState.sessionSearchQuery.isEmpty && searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            sessionsPanel
+        } else {
+            sessionsPanel
+                .overlay(alignment: .topTrailing) {
+                    sessionsSearchToolbar
+                        .offset(y: -38)
+                }
         }
     }
 
@@ -56,6 +80,15 @@ struct SessionsView: View {
                 )
                 .frame(maxWidth: .infinity, minHeight: 300)
             }
+        } else if appState.sessions.isEmpty && !appState.sessionSearchQuery.isEmpty {
+            HermesSurfacePanel {
+                ContentUnavailableView(
+                    "No matching sessions",
+                    systemImage: "magnifyingglass",
+                    description: Text("Try searching by session name, ID, or preview text.")
+                )
+                .frame(maxWidth: .infinity, minHeight: 300)
+            }
         } else if appState.sessions.isEmpty {
             HermesSurfacePanel {
                 ContentUnavailableView(
@@ -67,7 +100,7 @@ struct SessionsView: View {
             }
         } else {
             HermesSurfacePanel(
-                title: "Stored Sessions (\(appState.totalSessionsCount))",
+                title: panelTitle,
                 subtitle: "Select a session to inspect its transcript, metadata and last activity."
             ) {
                 ScrollView {
@@ -102,6 +135,21 @@ struct SessionsView: View {
                 }
             }
         }
+    }
+
+    private var sessionsSearchToolbar: some View {
+        HermesExpandableSearchField(
+            text: $searchText,
+            prompt: "Search sessions"
+        )
+    }
+
+    private var panelTitle: String {
+        if appState.sessionSearchQuery.isEmpty {
+            return "Stored Sessions (\(appState.totalSessionsCount))"
+        }
+
+        return "Matching Sessions (\(appState.totalSessionsCount))"
     }
 
     private var selectedSession: SessionSummary? {

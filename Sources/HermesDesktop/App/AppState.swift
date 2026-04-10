@@ -16,8 +16,10 @@ final class AppState: ObservableObject {
     @Published var sessionMessages: [SessionMessage] = []
     @Published var sessionsError: String?
     @Published var isLoadingSessions = false
+    @Published var isDeletingSession = false
     @Published var hasMoreSessions = false
     @Published var totalSessionsCount = 0
+    @Published private(set) var sessionSearchQuery = ""
     @Published var usageSummary: UsageSummary?
     @Published var usageError: String?
     @Published var isLoadingUsage = false
@@ -269,20 +271,26 @@ final class AppState: ObservableObject {
         setDocument(document)
     }
 
-    func loadSessions(reset: Bool = false) async {
+    func loadSessions(reset: Bool = false, query: String? = nil) async {
         guard let profile = activeConnection else { return }
         if isLoadingSessions { return }
 
+        let normalizedQuery = query?.trimmingCharacters(in: .whitespacesAndNewlines) ?? sessionSearchQuery
         let previousSelectedSessionID = selectedSessionID
 
         isLoadingSessions = true
         sessionsError = nil
 
+        if reset, query != nil {
+            sessionSearchQuery = normalizedQuery
+        }
+
         do {
             let page = try await sessionBrowserService.listSessions(
                 connection: profile,
                 offset: reset ? 0 : sessionOffset,
-                limit: sessionPageSize
+                limit: sessionPageSize,
+                query: normalizedQuery
             )
 
             if reset {
@@ -294,7 +302,7 @@ final class AppState: ObservableObject {
             }
 
             totalSessionsCount = page.totalCount
-            hasMoreSessions = page.items.count == sessionPageSize
+            hasMoreSessions = sessionOffset < totalSessionsCount
             isLoadingSessions = false
 
             if reset {
@@ -334,6 +342,31 @@ final class AppState: ObservableObject {
             sessionMessages = []
             sessionsError = error.localizedDescription
             setStatusMessage("Unable to load session transcript")
+        }
+    }
+
+    func deleteSession(_ session: SessionSummary) async {
+        guard let profile = activeConnection else { return }
+        if isDeletingSession { return }
+
+        isDeletingSession = true
+        sessionsError = nil
+
+        do {
+            try await sessionBrowserService.deleteSession(
+                connection: profile,
+                sessionID: session.id,
+                hintedSessionStore: overview?.sessionStore
+            )
+
+            await loadSessions(reset: true)
+            await loadUsage(forceRefresh: true)
+            isDeletingSession = false
+            setStatusMessage("Session deleted locally and on the remote Hermes host")
+        } catch {
+            isDeletingSession = false
+            sessionsError = error.localizedDescription
+            setStatusMessage("Unable to delete session")
         }
     }
 
@@ -518,10 +551,12 @@ final class AppState: ObservableObject {
         sessionMessages = []
         sessionsError = nil
         isLoadingSessions = false
+        isDeletingSession = false
         hasMoreSessions = false
         totalSessionsCount = 0
         selectedSessionID = nil
         sessionOffset = 0
+        sessionSearchQuery = ""
         usageSummary = nil
         usageError = nil
         isLoadingUsage = false

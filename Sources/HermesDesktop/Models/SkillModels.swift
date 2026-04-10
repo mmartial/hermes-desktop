@@ -65,6 +65,30 @@ struct SkillSummary: Codable, Identifiable, Hashable {
         }
         return badges
     }
+
+    var resolvedCategory: String {
+        guard let category,
+              !category.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return "Root"
+        }
+        return category
+    }
+
+    func matchesSearch(_ query: String) -> Bool {
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedQuery.isEmpty else { return true }
+
+        let normalizedQuery = trimmedQuery.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+        let haystacks = [
+            resolvedName,
+            resolvedCategory
+        ]
+
+        return haystacks.contains { value in
+            value.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+                .localizedStandardContains(normalizedQuery)
+        }
+    }
 }
 
 struct SkillDetail: Codable, Identifiable, Hashable {

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SkillsView: View {
     @EnvironmentObject private var appState: AppState
+    @State private var searchText = ""
 
     var body: some View {
         HSplitView {
@@ -19,7 +20,7 @@ struct SkillsView: View {
                     .disabled(appState.isLoadingSkills)
                 }
 
-                skillsPanel
+                skillsContent
             }
             .frame(minWidth: 300, idealWidth: 340, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(.horizontal, 20)
@@ -38,6 +39,19 @@ struct SkillsView: View {
             if appState.skills.isEmpty {
                 await appState.loadSkills(reset: true)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var skillsContent: some View {
+        if appState.skills.isEmpty {
+            skillsPanel
+        } else {
+            skillsPanel
+                .overlay(alignment: .topTrailing) {
+                    skillsSearchToolbar
+                        .offset(y: -38)
+                }
         }
     }
 
@@ -68,32 +82,63 @@ struct SkillsView: View {
             }
         } else {
             HermesSurfacePanel(
-                title: "Discovered Skills (\(appState.skills.count))",
+                title: panelTitle,
                 subtitle: "Select a skill to inspect its metadata, related assets and full SKILL.md content."
             ) {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 10) {
-                        ForEach(appState.skills) { skill in
-                            SkillCardRow(
-                                skill: skill,
-                                isSelected: skill.id == appState.selectedSkillID
-                            ) {
-                                Task {
-                                    await appState.loadSkillDetail(relativePath: skill.id)
+                if filteredSkills.isEmpty {
+                    ContentUnavailableView(
+                        "No matching skills",
+                        systemImage: "magnifyingglass",
+                        description: Text("Try searching by skill name or category.")
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 300)
+                } else {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 10) {
+                            ForEach(filteredSkills) { skill in
+                                SkillCardRow(
+                                    skill: skill,
+                                    isSelected: skill.id == appState.selectedSkillID
+                                ) {
+                                    Task {
+                                        await appState.loadSkillDetail(relativePath: skill.id)
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            }
-            .overlay(alignment: .topTrailing) {
-                if appState.isLoadingSkills && !appState.skills.isEmpty {
-                    ProgressView()
-                        .padding(18)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
             }
         }
+    }
+
+    private var skillsSearchToolbar: some View {
+        HStack(spacing: 10) {
+            if appState.isLoadingSkills && !appState.skills.isEmpty {
+                ProgressView()
+            }
+
+            HermesExpandableSearchField(
+                text: $searchText,
+                prompt: "Search skills"
+            )
+        }
+    }
+
+    private var panelTitle: String {
+        let total = appState.skills.count
+        let filtered = filteredSkills.count
+
+        if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Discovered Skills (\(total))"
+        }
+
+        return "Discovered Skills (\(filtered) of \(total))"
+    }
+
+    private var filteredSkills: [SkillSummary] {
+        appState.skills.filter { $0.matchesSearch(searchText) }
     }
 
     private var selectedSkill: SkillSummary? {

@@ -10,10 +10,11 @@ final class SessionBrowserService: @unchecked Sendable {
     func listSessions(
         connection: ConnectionProfile,
         offset: Int,
-        limit: Int
+        limit: Int,
+        query: String
     ) async throws -> SessionListPage {
         let script = try RemotePythonScript.wrap(
-            SessionPageRequest(offset: offset, limit: limit),
+            SessionPageRequest(offset: offset, limit: limit, query: query),
             body: sessionListBody
         )
 
@@ -40,6 +41,28 @@ final class SessionBrowserService: @unchecked Sendable {
         )
 
         return response.items
+    }
+
+    func deleteSession(
+        connection: ConnectionProfile,
+        sessionID: String,
+        hintedSessionStore: RemoteSessionStore?
+    ) async throws {
+        let script = try RemotePythonScript.wrap(
+            SessionDeleteRequest(
+                sessionID: sessionID,
+                hintedStorePath: hintedSessionStore?.path,
+                hintedSessionTable: hintedSessionStore?.sessionTable,
+                hintedMessageTable: hintedSessionStore?.messageTable
+            ),
+            body: sessionDeleteBody
+        )
+
+        _ = try await sshTransport.executeJSON(
+            on: connection,
+            pythonScript: script,
+            responseType: SessionDeleteResponse.self
+        )
     }
 
     private var sessionListBody: String {
@@ -125,6 +148,10 @@ final class SessionBrowserService: @unchecked Sendable {
 
                 items.sort(key=lambda item: sort_key(item.get("last_active") or item.get("started_at")), reverse=True)
 
+            query = normalize_search_text(request.get("query"))
+            if query is not None:
+                items = [item for item in items if session_matches_query(item, query)]
+
             start = int(request.get("offset", 0))
             end = start + int(request.get("limit", 50))
 
@@ -184,7 +211,9 @@ final class SessionBrowserService: @unchecked Sendable {
                             context["message_timestamp_column"],
                         }:
                             continue
-                        metadata[key] = normalize_json_value(value)
+                        normalized_value = prune_metadata_value(normalize_json_value(value))
+                        if normalized_value is not None:
+                            metadata[key] = normalized_value
 
                     items.append({
                         "id": stringify(record.get(context["message_id_column"])) or str(len(items) + 1),
@@ -206,6 +235,87 @@ final class SessionBrowserService: @unchecked Sendable {
                     context["connection"].close()
             except Exception:
                 pass
+        """
+    }
+
+    private var sessionDeleteBody: String {
+        sharedSessionHelpers + """
+
+        request = payload
+
+        try:
+            session_id = stringify(request.get("session_id"))
+            if not session_id:
+                fail("The session ID is required.")
+
+            deleted_session_rows = 0
+            deleted_message_rows = 0
+            deleted_jsonl_artifact = False
+
+            store_path, session_table, message_table = discover_store_location(
+                request.get("hinted_store_path"),
+                request.get("hinted_session_table"),
+                request.get("hinted_message_table")
+            )
+
+            if store_path is not None:
+                connection = sqlite3.connect(store_path)
+                connection.execute("PRAGMA busy_timeout = 2000")
+
+                try:
+                    session_columns = [row[1] for row in connection.execute(
+                        f"PRAGMA table_info({quote_ident(session_table)})"
+                    ).fetchall()]
+                    message_columns = [row[1] for row in connection.execute(
+                        f"PRAGMA table_info({quote_ident(message_table)})"
+                    ).fetchall()]
+
+                    session_id_column = choose_column(session_columns, ["id", "session_id"])
+                    message_session_id_column = choose_column(message_columns, ["session_id", "conversation_id"])
+
+                    missing = [
+                        name for name, value in [
+                            ("session id", session_id_column),
+                            ("message session id", message_session_id_column),
+                        ] if value is None
+                    ]
+
+                    if missing:
+                        fail("Unsupported session schema: missing " + ", ".join(missing))
+
+                    with connection:
+                        deleted_message_rows = connection.execute(
+                            f"DELETE FROM {quote_ident(message_table)} "
+                            f"WHERE {quote_ident(message_session_id_column)} = ?",
+                            (session_id,)
+                        ).rowcount
+
+                        deleted_session_rows = connection.execute(
+                            f"DELETE FROM {quote_ident(session_table)} "
+                            f"WHERE {quote_ident(session_id_column)} = ?",
+                            (session_id,)
+                        ).rowcount
+                finally:
+                    connection.close()
+
+            artifact = None
+            for path in discover_jsonl_artifacts():
+                if path.stem == session_id:
+                    artifact = path
+                    break
+
+            if artifact is not None:
+                artifact.unlink()
+                deleted_jsonl_artifact = True
+
+            if deleted_session_rows <= 0 and deleted_message_rows <= 0 and not deleted_jsonl_artifact:
+                fail(f"No remote Hermes session matching '{session_id}' was found to delete.")
+
+            print(json.dumps({
+                "ok": True,
+            }, ensure_ascii=False))
+        except Exception as exc:
+            fail(f"Unable to delete the remote Hermes session: {exc}")
         """
     }
 
@@ -243,6 +353,15 @@ final class SessionBrowserService: @unchecked Sendable {
         def quote_ident(value):
             return '"' + value.replace('"', '""') + '"'
 
+        def expand_remote_path(value, home):
+            if not value:
+                return None
+            if value == "~":
+                return home
+            if value.startswith("~/"):
+                return home / value[2:]
+            return pathlib.Path(value)
+
         def stringify(value):
             if value is None:
                 return None
@@ -265,6 +384,39 @@ final class SessionBrowserService: @unchecked Sendable {
             if isinstance(value, (str, int, float, bool)):
                 return value
             return str(value)
+
+        def normalize_search_text(value):
+            text = stringify(value)
+            if text is None:
+                return None
+            text = text.strip()
+            return text.casefold() if text else None
+
+        def session_matches_query(item, query):
+            for field in (item.get("id"), item.get("title"), item.get("preview")):
+                text = normalize_search_text(field)
+                if text is not None and query in text:
+                    return True
+            return False
+
+        def prune_metadata_value(value):
+            if value is None:
+                return None
+            if isinstance(value, dict):
+                cleaned = {}
+                for key, item in value.items():
+                    normalized_item = prune_metadata_value(item)
+                    if normalized_item is not None:
+                        cleaned[key] = normalized_item
+                return cleaned or None
+            if isinstance(value, list):
+                cleaned = []
+                for item in value:
+                    normalized_item = prune_metadata_value(item)
+                    if normalized_item is not None:
+                        cleaned.append(normalized_item)
+                return cleaned or None
+            return value
 
         def sort_key(value):
             if value is None:
@@ -341,15 +493,21 @@ final class SessionBrowserService: @unchecked Sendable {
 
             return stringify(content)
 
-        def iter_session_store_candidates(hermes_home):
+        def iter_session_store_candidates(hermes_home, home, hinted_path=None):
             seen = set()
 
             def emit(candidate):
+                if candidate is None:
+                    return None
                 resolved = str(candidate)
                 if resolved in seen or not candidate.is_file():
                     return None
                 seen.add(resolved)
                 return candidate
+
+            hinted_candidate = emit(expand_remote_path(hinted_path, home))
+            if hinted_candidate is not None:
+                yield hinted_candidate
 
             preferred = [
                 hermes_home / "state.db",
@@ -406,32 +564,57 @@ final class SessionBrowserService: @unchecked Sendable {
                 reverse=True,
             )
 
-        def discover_store():
+        def discover_store_location(hinted_path=None, hinted_session_table=None, hinted_message_table=None):
             home = pathlib.Path.home()
             hermes_home = home / ".hermes"
             if not hermes_home.exists():
                 return None, None, None
 
-            for candidate in iter_session_store_candidates(hermes_home):
+            for candidate in iter_session_store_candidates(hermes_home, home, hinted_path):
                 try:
                     connection = sqlite3.connect(f"file:{candidate}?mode=ro", uri=True)
                     connection.execute("PRAGMA busy_timeout = 2000")
                     tables = [row[0] for row in connection.execute(
                         "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
                     ).fetchall()]
-                    session_table = choose_table(tables, "sessions")
-                    message_table = choose_table(tables, "messages")
+                    session_table = None
+                    message_table = None
+
+                    if hinted_session_table:
+                        for table in tables:
+                            if table.lower() == hinted_session_table.lower():
+                                session_table = table
+                                break
+                    if hinted_message_table:
+                        for table in tables:
+                            if table.lower() == hinted_message_table.lower():
+                                message_table = table
+                                break
+
+                    if session_table is None:
+                        session_table = choose_table(tables, "sessions")
+                    if message_table is None:
+                        message_table = choose_table(tables, "messages")
+
                     if session_table and message_table:
-                        return connection, session_table, message_table
+                        connection.close()
+                        return str(candidate), session_table, message_table
                     connection.close()
                 except Exception:
                     continue
             return None, None, None
 
-        def try_open_store():
-            connection, session_table, message_table = discover_store()
-            if not connection:
+        def try_open_store(hinted_path=None, hinted_session_table=None, hinted_message_table=None):
+            store_path, session_table, message_table = discover_store_location(
+                hinted_path,
+                hinted_session_table,
+                hinted_message_table
+            )
+            if not store_path:
                 return None
+
+            connection = sqlite3.connect(f"file:{store_path}?mode=ro", uri=True)
+            connection.execute("PRAGMA busy_timeout = 2000")
 
             session_columns = [row[1] for row in connection.execute(
                 f"PRAGMA table_info({quote_ident(session_table)})"
@@ -465,6 +648,7 @@ final class SessionBrowserService: @unchecked Sendable {
 
             return {
                 "connection": connection,
+                "store_path": store_path,
                 "session_table": session_table,
                 "message_table": message_table,
                 "session_columns": session_columns,
@@ -570,7 +754,9 @@ final class SessionBrowserService: @unchecked Sendable {
                     for key, value in record.items():
                         if key in {"role", "content", "timestamp"}:
                             continue
-                        metadata[key] = normalize_json_value(value)
+                        normalized_value = prune_metadata_value(normalize_json_value(value))
+                        if normalized_value is not None:
+                            metadata[key] = normalized_value
 
                     items.append({
                         "id": str(index),
@@ -588,6 +774,7 @@ final class SessionBrowserService: @unchecked Sendable {
 private struct SessionPageRequest: Encodable {
     let offset: Int
     let limit: Int
+    let query: String
 }
 
 private struct SessionDetailRequest: Encodable {
@@ -596,4 +783,22 @@ private struct SessionDetailRequest: Encodable {
     enum CodingKeys: String, CodingKey {
         case sessionID = "session_id"
     }
+}
+
+private struct SessionDeleteRequest: Encodable {
+    let sessionID: String
+    let hintedStorePath: String?
+    let hintedSessionTable: String?
+    let hintedMessageTable: String?
+
+    enum CodingKeys: String, CodingKey {
+        case sessionID = "session_id"
+        case hintedStorePath = "hinted_store_path"
+        case hintedSessionTable = "hinted_session_table"
+        case hintedMessageTable = "hinted_message_table"
+    }
+}
+
+private struct SessionDeleteResponse: Decodable {
+    let ok: Bool
 }

@@ -203,3 +203,79 @@ struct HermesActionTile: View {
         .buttonStyle(.plain)
     }
 }
+
+struct HermesExpandableSearchField: View {
+    @Binding var text: String
+
+    var prompt = "Search"
+    var collapsedWidth: CGFloat = 34
+    var expandedWidth: CGFloat = 240
+
+    @FocusState private var isFocused: Bool
+    @State private var isExpanded = false
+
+    private var shouldShowExpandedField: Bool {
+        isExpanded || !text.isEmpty
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button {
+                withAnimation(.spring(response: 0.24, dampingFraction: 0.88)) {
+                    isExpanded = true
+                }
+                DispatchQueue.main.async {
+                    isFocused = true
+                }
+            } label: {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(shouldShowExpandedField ? .secondary : .primary)
+                    .frame(width: 14, height: 14)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(prompt)
+
+            if shouldShowExpandedField {
+                TextField(prompt, text: $text)
+                    .textFieldStyle(.plain)
+                    .font(.subheadline)
+                    .focused($isFocused)
+                    .submitLabel(.search)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button {
+                    text = ""
+                    isFocused = false
+                    isExpanded = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close search")
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(width: shouldShowExpandedField ? expandedWidth : collapsedWidth, height: 30, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color(NSColor.controlBackgroundColor))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.primary.opacity(shouldShowExpandedField ? 0.10 : 0.06), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(shouldShowExpandedField ? 0.06 : 0.03), radius: shouldShowExpandedField ? 8 : 4, y: 2)
+        .animation(.spring(response: 0.24, dampingFraction: 0.88), value: shouldShowExpandedField)
+        .onAppear {
+            isExpanded = !text.isEmpty
+        }
+        .onChange(of: isFocused) { _, focused in
+            if !focused && text.isEmpty {
+                isExpanded = false
+            }
+        }
+    }
+}

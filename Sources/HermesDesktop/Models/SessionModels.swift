@@ -48,6 +48,15 @@ struct SessionMessage: Codable, Identifiable, Hashable {
     let content: String?
     let timestamp: JSONValue?
     let metadata: [String: JSONValue]?
+
+    var displayMetadata: [String: JSONValue]? {
+        guard let metadata else {
+            return nil
+        }
+
+        let filtered = metadata.compactMapValues { $0.removingNulls }
+        return filtered.isEmpty ? nil : filtered
+    }
 }
 
 enum JSONValue: Codable, Hashable {
@@ -152,6 +161,21 @@ enum JSONValue: Codable, Hashable {
             return "null"
         default:
             return stringValue ?? "null"
+        }
+    }
+
+    var removingNulls: JSONValue? {
+        switch self {
+        case .null:
+            return nil
+        case .object(let value):
+            let filtered = value.compactMapValues { $0.removingNulls }
+            return filtered.isEmpty ? nil : .object(filtered)
+        case .array(let value):
+            let filtered = value.compactMap { $0.removingNulls }
+            return filtered.isEmpty ? nil : .array(filtered)
+        default:
+            return self
         }
     }
 }
