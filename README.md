@@ -51,13 +51,13 @@ public README.
 
 - a native Mac app that feels like a Mac app, not a browser wrapper
 - a real embedded SSH terminal with tabs
-- direct editing for the canonical Hermes files:
+- conflict-aware editing for the canonical Hermes files:
   - `~/.hermes/memories/USER.md`
   - `~/.hermes/memories/MEMORY.md`
   - `~/.hermes/SOUL.md`
-- aggregate usage totals from the canonical session store in `~/.hermes/state.db`
+- aggregate usage totals and model-level breakdowns from the canonical session store in `~/.hermes/state.db`
 - recursive skill browsing from `~/.hermes/skills/**/SKILL.md`
-- session browsing from the canonical remote store at `~/.hermes/state.db`
+- session browsing, search, and deletion from the canonical remote store at `~/.hermes/state.db`
 - fallback to `~/.hermes/sessions/*.jsonl` only if the SQLite store is not
   available
 
@@ -188,14 +188,15 @@ If `Test` passes, `Use Host` should be on solid ground.
   Confirms the remote `HOME`, the Hermes root, the tracked Hermes files, and
   the session source.
 - `Files`
-  Lets you edit `USER.md`, `MEMORY.md`, and `SOUL.md` on the host.
+  Lets you edit `USER.md`, `MEMORY.md`, and `SOUL.md` on the host with a remote conflict check before save.
 - `Sessions`
-  Reads the real remote session store from `~/.hermes/state.db`.
+  Reads the real remote session store from `~/.hermes/state.db`, with search, cleaner metadata, and remote deletion.
 - `Usage`
-  Shows aggregate input and output token totals from the same remote session
-  store.
+  Shows aggregate input and output token totals, top sessions, top models, and
+  recent session trends from the same remote session store.
 - `Skills`
-  Discovers and reads remote `SKILL.md` files under `~/.hermes/skills/`.
+  Discovers and reads remote `SKILL.md` files under `~/.hermes/skills/`, with
+  quick filtering in the list.
 - `Terminal`
   Opens the real SSH shell inside the app.
 
@@ -289,6 +290,16 @@ Because that is the canonical Hermes session store. Reading it gives the app
 the same view Hermes itself uses. `~/.hermes/sessions/*.jsonl` exists as a
 fallback only when the SQLite store is not available.
 
+### What happens if a remote file changed after I opened it?
+
+Hermes Desktop will not blindly overwrite it.
+
+Before saving `USER.md`, `MEMORY.md`, or `SOUL.md`, the app checks whether the
+remote file still matches the version you originally loaded. If it changed on
+the host in the meantime, save is blocked and your local edits stay intact.
+At that point the app asks you to `Reload from Remote` first, so you can make
+an intentional decision instead of silently overwriting newer remote state.
+
 ## Roadmap
 
 This is the direction from here:
@@ -296,12 +307,14 @@ This is the direction from here:
 ### Recently Shipped
 
 - [x] richer workflows around the canonical Hermes files: `USER.md`, `MEMORY.md`, and `SOUL.md`
-- [x] a native usage dashboard for aggregate input and output tokens from the remote Hermes session store
+- [x] a native usage dashboard with aggregate token totals, top sessions, and model-level breakdowns from the remote Hermes session store
 - [x] a recursive skills browser for discovering and inspecting remote `SKILL.md` files under `~/.hermes/skills/`
+- [x] richer session workflows: cleaner metadata, search, deletion, and refresh-on-entry behavior
 
 ### Next
 
 - multi-profile support, aligned with Hermes Agent profiles and the app-side connection flow needed to select and use them cleanly
+- skill creation and editing from the app, plus carefully chosen discovery flows if they fit the host-first model
 - UI skins and appearance options to personalize the terminal and the broader chat-like workspace
 - clearer documentation, setup guides, and troubleshooting for new users
 - easier distribution for non-technical users through signed, notarized builds and, if realistic, App Store or similarly frictionless delivery
