@@ -31,21 +31,24 @@ macOS without hiding how it actually works.
 <table>
   <tr>
     <td width="50%">
-      <img src="assets/readme-preview-usage-blurred.png" alt="Hermes Desktop Usage view" />
+      <img src="assets/READ-ME-SESSIONS-BLURRED.png" alt="Hermes Desktop Sessions view" />
     </td>
     <td width="50%">
-      <img src="assets/readme-skills-preview_blurred.png" alt="Hermes Desktop Skills view" />
+      <img src="assets/READ-ME-USAGE.png" alt="Hermes Desktop Usage view" />
     </td>
   </tr>
   <tr>
-    <td colspan="2">
-      <img src="assets/readme-terminal-preview-blurred_blurred.png" alt="Hermes Desktop Terminal view" />
+    <td width="50%">
+      <img src="assets/README-SKILL-BLURRED.png" alt="Hermes Desktop Skills view" />
+    </td>
+    <td width="50%">
+      <img src="assets/README-TERMINAL-BLURRED.png" alt="Hermes Desktop Terminal view" />
     </td>
   </tr>
 </table>
 
-Usage, Skills, and Terminal on a live Hermes host, kept privacy-safe for the
-public README.
+Sessions, Usage, Skills, and Terminal on a live Hermes host, kept privacy-safe
+for the public README.
 
 ## What You Get
 
