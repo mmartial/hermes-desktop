@@ -313,6 +313,7 @@ This is the direction from here:
 - [x] a native usage dashboard with aggregate token totals, top sessions, and model-level breakdowns from the remote Hermes session store
 - [x] a recursive skills browser for discovering and inspecting remote `SKILL.md` files under `~/.hermes/skills/`
 - [x] richer session workflows: cleaner metadata, search, deletion, and refresh-on-entry behavior
+- [x] universal macOS release packaging so the app bundle can target both Apple Silicon and Intel Macs from one build pipeline
 
 ### Next
 
@@ -349,4 +350,4 @@ To create the GitHub Releases archive:
 
 Release artifact:
 
-- `dist/HermesDesktop.app.zip` for Apple Silicon Macs
+- `dist/HermesDesktop.app.zip` as a universal macOS archive for Apple Silicon and Intel Macs

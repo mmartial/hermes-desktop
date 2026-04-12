@@ -16,6 +16,13 @@ ICONSET_PATH="$ROOT_DIR/packaging/AppIcon.iconset"
 ICNS_PATH="$ROOT_DIR/packaging/HermesDesktop.icns"
 PLIST_PATH="$ROOT_DIR/packaging/Info.plist"
 SHADER_SOURCE_PATH="$ROOT_DIR/Vendor/SwiftTerm/Sources/SwiftTerm/Apple/Metal/Shaders.metal"
+UNIVERSAL_EXECUTABLE_PATH="$SCRATCH_PATH/${APP_NAME}-universal"
+
+if [[ -n "${HERMES_MAC_ARCHS:-}" ]]; then
+    read -r -a BUILD_ARCHES <<<"$HERMES_MAC_ARCHS"
+else
+    BUILD_ARCHES=(arm64 x86_64)
+fi
 
 mkdir -p \
     "$ROOT_DIR/dist" \
@@ -96,16 +103,34 @@ SWIFT_FLAGS=(
     --scratch-path "$SCRATCH_PATH"
 )
 
-echo "Building $APP_DISPLAY_NAME with SDK: $BUILD_SDK"
-env "${BUILD_ENV[@]}" swift "${SWIFT_FLAGS[@]}"
+build_arch() {
+    local arch="$1"
+    echo "Building $APP_DISPLAY_NAME for $arch with SDK: $BUILD_SDK"
+    env "${BUILD_ENV[@]}" swift "${SWIFT_FLAGS[@]}" --arch "$arch"
+}
 
-BIN_DIR="$(env "${BUILD_ENV[@]}" swift "${SWIFT_FLAGS[@]}" --show-bin-path)"
-EXECUTABLE_PATH="$BIN_DIR/$APP_NAME"
+bin_dir_for_arch() {
+    local arch="$1"
+    env "${BUILD_ENV[@]}" swift "${SWIFT_FLAGS[@]}" --arch "$arch" --show-bin-path
+}
 
-if [[ ! -x "$EXECUTABLE_PATH" ]]; then
-    echo "error: expected executable not found at $EXECUTABLE_PATH" >&2
-    exit 1
-fi
+echo "Building $APP_DISPLAY_NAME universal bundle for architectures: ${BUILD_ARCHES[*]}"
+for arch in "${BUILD_ARCHES[@]}"; do
+    build_arch "$arch"
+done
+
+EXECUTABLE_PATHS=()
+for arch in "${BUILD_ARCHES[@]}"; do
+    BIN_DIR="$(bin_dir_for_arch "$arch")"
+    EXECUTABLE_PATH="$BIN_DIR/$APP_NAME"
+
+    if [[ ! -x "$EXECUTABLE_PATH" ]]; then
+        echo "error: expected executable not found for $arch at $EXECUTABLE_PATH" >&2
+        exit 1
+    fi
+
+    EXECUTABLE_PATHS+=("$EXECUTABLE_PATH")
+done
 
 if [[ ! -f "$SHADER_SOURCE_PATH" ]]; then
     echo "error: expected SwiftTerm shader source not found at $SHADER_SOURCE_PATH" >&2
@@ -117,7 +142,14 @@ generate_icon
 rm -rf "$BUNDLE_PATH"
 mkdir -p "$MACOS_PATH" "$RESOURCES_PATH"
 
-cp "$EXECUTABLE_PATH" "$MACOS_PATH/$APP_NAME"
+rm -f "$UNIVERSAL_EXECUTABLE_PATH"
+if (( ${#EXECUTABLE_PATHS[@]} == 1 )); then
+    cp "${EXECUTABLE_PATHS[0]}" "$UNIVERSAL_EXECUTABLE_PATH"
+else
+    lipo -create -output "$UNIVERSAL_EXECUTABLE_PATH" "${EXECUTABLE_PATHS[@]}"
+fi
+
+cp "$UNIVERSAL_EXECUTABLE_PATH" "$MACOS_PATH/$APP_NAME"
 cp "$PLIST_PATH" "$CONTENTS_PATH/Info.plist"
 cp "$ICNS_PATH" "$RESOURCES_PATH/AppIcon.icns"
 cp "$SHADER_SOURCE_PATH" "$RESOURCES_PATH/Shaders.metal"
@@ -127,4 +159,5 @@ codesign --verify --deep --strict "$BUNDLE_PATH" >/dev/null
 echo
 echo "App bundle created:"
 echo "  $BUNDLE_PATH"
+echo "Architectures: $(lipo -archs "$MACOS_PATH/$APP_NAME")"
 echo "Ad-hoc signed bundle created: macOS may still require right-click > Open on first launch."
