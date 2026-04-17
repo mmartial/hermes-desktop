@@ -2,17 +2,18 @@
 
 Native macOS companion for Hermes Agent over SSH.
 
-Hermes Desktop is for people who already use Hermes and want the workflow to
-feel at home on a Mac without changing what Hermes fundamentally is.
+It turns the daily Hermes loop into something you can actually live in on a
+Mac.
 
-It brings the parts of the workflow that matter most into one native window:
+It brings the parts of the workflow that matter most into one focused window:
 sessions, canonical files, usage, skills, cron jobs, and a real terminal.
 
-If you already live in Hermes, the app should feel immediately legible: your
-host, your files, your shell.
+If Hermes is already part of how you work, the app should feel immediately
+legible: same host, same files, same shell, same profiles, same scheduler,
+same session history.
 
-No browser wrapper. No gateway API. No daemon on the host. No local mirror that
-slowly drifts out of sync.
+No browser wrapper. No gateway API. No daemon on the host. No local mirror. No
+extra sync layer slowly drifting away from the machine that actually matters.
 
 That restraint is intentional:
 
@@ -22,9 +23,12 @@ That restraint is intentional:
 - does not mirror files onto your Mac
 - does not install a helper service on the remote host
 
-That is the point of the app. Hermes Desktop does not try to replace the real
-Hermes workflow. It makes that workflow feel faster, calmer, and more native on
-macOS without hiding how it actually works.
+That is the point of the app.
+
+Hermes Desktop does not invent a softer second version of Hermes. It makes the
+real workflow feel calm, fast, and native on a Mac while keeping the model
+visible. You still know what host you are on, which Hermes profile is active,
+where the canonical state lives, and which path the app is actually using.
 
 ## Preview
 
@@ -53,10 +57,17 @@ for the public README.
 ## What You Get
 
 - a native Mac app that feels like a Mac app, not a browser control panel
-- direct SSH connection profiles, including the default Hermes home and named
-  Hermes profiles on the same host
-- an overview that surfaces the active profile, resolved paths, session store,
-  cron location, and host readiness checks
+- direct SSH connection profiles for the default Hermes home and named Hermes
+  profiles on the same host
+- a profile-aware workspace where overview, files, sessions, usage, cron jobs,
+  skills, and terminal behavior all resolve against the selected Hermes profile
+- a real embedded SSH terminal with multiple tabs across hosts and profiles,
+  plus quick themes and live background and text color controls
+- a natural multi-agent workflow on macOS: keep one tab on a shell, another on
+  a scheduler, another on a different profile, all without inventing a second
+  model of the host
+- an overview that surfaces the active profile, discovered profiles, resolved
+  paths, session store, cron location, and host readiness checks
 - conflict-aware editing for the canonical Hermes files:
   - `~/.hermes/memories/USER.md`
   - `~/.hermes/memories/MEMORY.md`
@@ -68,9 +79,12 @@ for the public README.
 - aggregate usage totals, recent trends, model breakdowns, and host-wide
   cross-profile totals when more than one Hermes profile is readable
 - recursive skill browsing from `~/.hermes/skills/**/SKILL.md`
-- cron job browsing and editing for the canonical remote scheduler state in
-  `~/.hermes/cron/jobs.json`
-- a real embedded SSH terminal with tabs and appearance controls
+- direct skill editing and creation from Hermes Desktop, with atomic saves and
+  conflict checks against the live remote `SKILL.md`
+- cron job browsing, creation, editing, pause, resume, run-now, and deletion
+  for the canonical remote scheduler state in `~/.hermes/cron/jobs.json`,
+  including schedule, model, attached skills, and delivery target details
+- universal packaging for Apple Silicon and Intel Macs from the same build flow
 
 If Hermes runs there and SSH already works, Hermes Desktop will usually meet you
 there. That includes:
@@ -84,10 +98,12 @@ there. That includes:
 
 Nous Research now ships the official Hermes web dashboard. That is good news.
 
-It clarifies the product landscape and removes a lot of the confusion created by
-third-party web dashboards trying to sit between you and your actual Hermes
-host. Hermes Desktop does not compete with the official dashboard by trying to
-be a second browser surface. It complements it.
+It clarifies the product landscape.
+
+The official dashboard is great for browser-based management. Hermes Desktop is
+for the side of Hermes you want to live in on a Mac.
+
+That is not a hedge. It is a clean division of labor.
 
 The split is simple:
 
@@ -95,11 +111,14 @@ The split is simple:
   config, API keys, logs, and dashboard-style administration
 - use Hermes Desktop when you want the host itself to feel native on macOS:
   direct SSH, canonical files, real sessions, profile-aware usage, cron
-  workflows, skills, and a real terminal
+  workflows, editable skills, and a real terminal
 
-That distinction matters. The official dashboard is the right browser surface.
-Hermes Desktop is the native Mac companion for people who want to stay close to
-the host and work through the real SSH path.
+That distinction matters because it preserves the strength of both tools.
+
+Hermes Desktop is not trying to drag Hermes into a vague middle layer between
+browser UI and host reality. It is for people who want to stay close to the
+host, work through the real SSH path, and still have a polished native Mac
+workspace around it.
 
 ## Before You Download
 
@@ -199,8 +218,14 @@ Examples:
 - set `Hermes profile` to `researcher` to use
   `~/.hermes/profiles/researcher`
 
-The app keeps that selection visible across overview, usage, cron jobs, and the
-embedded terminal.
+The important part is what happens after that: the profile selection is not a
+label stuck on a form. It flows through the app.
+
+Overview resolves against that profile. Usage stays scoped to that profile while
+still being able to show host-wide cross-profile totals. Cron jobs target that
+profile's scheduler state. The terminal launches with the right `HERMES_HOME`.
+And terminal tabs can stay open across different profiles, so it is natural to
+work multiple Hermes agents on the same host side by side.
 
 ### Same Mac
 
@@ -239,16 +264,40 @@ If `Test` passes, `Use Host` should be on solid ground.
   cleaner metadata, refresh-on-entry behavior, and remote deletion.
 - `Cron Jobs`
   Browses the real Hermes cron definitions on the host, with create, edit,
-  pause, resume, run-now, and delete actions.
+  pause, resume, run-now, and delete actions, plus the details that matter when
+  you are actually running them: schedule, model, skills, delivery target, and
+  recent status.
 - `Usage`
   Shows aggregate input and output token totals, top sessions, top models,
   recent session trends, and when available, a host-wide profile breakdown.
 - `Skills`
-  Discovers and reads remote `SKILL.md` files under `~/.hermes/skills/`, with
-  quick filtering in the list.
+  Discovers, reads, creates, and edits remote `SKILL.md` files under
+  `~/.hermes/skills/`, with quick filtering, companion folder awareness,
+  optional folder scaffolding, and remote conflict checks before save.
 - `Terminal`
-  Opens the real SSH shell inside the app, with multiple tabs and optional
-  appearance presets.
+  Opens the real SSH shell inside the app, with multiple tabs, quick theme
+  presets, live color tuning, and room for a genuinely multi-profile,
+  multi-agent workflow that still stays close to the host.
+
+## Why It Feels Different
+
+Hermes Desktop comes from using Hermes enough to care about the annoying edges.
+
+That is why the app keeps landing on the details that matter:
+
+- the selected Hermes profile is not cosmetic; it stays coherent across the
+  whole app
+- terminal tabs are not ornamental; they let you keep parallel agent work open
+  across hosts and profiles without losing context
+- session and usage views come from the canonical remote store, not from a
+  second local interpretation
+- edits to memories and skills save atomically and respect remote state instead
+  of blindly overwriting it
+- cron workflows live next to the rest of the host workflow instead of being
+  treated as a separate product
+
+The result is a Mac app that feels calm not because it hides the underlying
+system, but because it stays close to it.
 
 ## Why SSH And A Real Terminal
 
@@ -261,6 +310,11 @@ It does not try to hide Hermes behind a separate gateway layer, invent a second
 source of truth, or turn the workflow into something softer and less reliable.
 The goal is not to abstract Hermes away. The goal is to give it a native Mac
 surface that still feels honest.
+
+That honesty is precisely what makes the app reassuring. You do not need to
+guess where your data lives, which machine is authoritative, or whether the app
+invented its own shadow world to feel convenient. Hermes Desktop stays close to
+the host because that is the more trustworthy design.
 
 ## FAQ
 
@@ -300,8 +354,8 @@ Because they solve different problems.
 The official dashboard is a browser-based management surface. Hermes Desktop is
 a native Mac workspace for direct SSH-based daily use. If you want config, API
 keys, and browser-admin flows, the dashboard is the natural place. If you want
-sessions, canonical files, cron jobs, profile-aware usage, skills, and a real
-terminal in one native macOS window, that is what Hermes Desktop is for.
+sessions, canonical files, cron jobs, profile-aware usage, editable skills, and
+a real terminal in one native macOS window, that is what Hermes Desktop is for.
 
 The dashboard is not a threat to this app. It sharpens the case for it.
 
@@ -376,8 +430,9 @@ intentional decision instead of silently overwriting newer remote state.
 
 Most of the original roadmap is now shipped.
 
-This app has reached the point we wanted: a calm, native macOS surface for the
-real Hermes workflow, still anchored to SSH and the host as source of truth.
+This app has reached the point we wanted: a calm, capable native macOS
+workspace for the real Hermes workflow, still anchored to SSH and the host as
+source of truth.
 
 ### Shipped
 
@@ -387,19 +442,18 @@ real Hermes workflow, still anchored to SSH and the host as source of truth.
   refresh-on-entry behavior
 - [x] a usage dashboard with aggregate token totals, top sessions, top models,
   trends, and host-wide multi-profile totals when available
-- [x] a recursive skills browser for discovering and inspecting remote
-  `SKILL.md` files under `~/.hermes/skills/`
+- [x] native skill workflows for discovering, inspecting, creating, and editing
+  remote `SKILL.md` files under `~/.hermes/skills/`
 - [x] profile-aware host workflows aligned with Hermes Agent profiles on the
   same SSH target
 - [x] native cron job workflows for the canonical remote scheduler state
-- [x] a real embedded SSH terminal with tabs and appearance controls
+- [x] a real embedded SSH terminal with tabs, appearance controls, and coherent
+  multi-profile workspace behavior
 - [x] universal macOS release packaging for Apple Silicon and Intel, with
   bundle version stamping in the packaging flow
 
 ### From Here
 
-- follow Hermes Agent upstream and adopt new capabilities when they strengthen
-  the SSH-first Mac workflow
 - reduce distribution friction with signing and notarization
 - keep polishing onboarding, diagnostics, terminal UX, and multi-host details
   without adding a second transport model or shadow state
