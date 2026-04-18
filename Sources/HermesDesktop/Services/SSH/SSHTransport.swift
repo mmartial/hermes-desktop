@@ -1,7 +1,10 @@
 import Foundation
 import OSLog
 
-private let logger = Logger(subsystem: "net.allmytech.HermesDesktop", category: "SSHTransport")
+private let logger = Logger(
+    subsystem: Bundle.main.bundleIdentifier ?? "HermesDesktop",
+    category: "SSHTransport"
+)
 
 struct SSHCommandResult {
     let stdout: String
